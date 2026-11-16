@@ -2,6 +2,7 @@
 import json
 from dataclasses import dataclass
 from fractions import Fraction
+from changes import component_areas
 from geometry import rectangle
 from storage import atomic
 from vendor.ring1 import Region
@@ -39,6 +40,18 @@ class Analysis:
             if region.intersects(r):
                 hits.append(Hit(region_id, region.area(r), region.boundary_touches(r)))
         return tuple(hits)
+
+    def changes(self, region_id, old_revision, new_revision, window):
+        """Open-set gained/lost component areas between two retained revisions."""
+        r = rectangle(window)
+        # Missing region or any not-retained revision raises KeyError; the
+        # window is validated first, matching the original query conventions.
+        old_rings = self.archive.read_revision(region_id, old_revision)
+        new_rings = self.archive.read_revision(region_id, new_revision)
+        if old_revision == new_revision:
+            return {"gained": (), "lost": ()}
+        gained, lost = component_areas(old_rings, new_rings, r)
+        return {"gained": gained, "lost": lost}
 
     def save(self, name, window, region_ids=None):
         """Bind a closed window and current IDs, not a copy of their geometry."""

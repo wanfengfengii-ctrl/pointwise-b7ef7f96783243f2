@@ -8,6 +8,8 @@ from analysis import Analysis
 from archive import Archive
 from samples import build_legacy
 from storage import connect
+import history_checks
+
 
 def demo():
     with tempfile.TemporaryDirectory(prefix="ring-archive-") as directory:
@@ -32,15 +34,26 @@ def demo():
         finally:
             db.close()
 
+
+def verify():
+    suite = unittest.defaultTestLoader.discover(str(Path(__file__).parent / "tests"))
+    ok = unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful()
+    # Public history fixtures exercise retention, rollback and reopen too.
+    history_checks.scaffold()
+    history_checks.verify()
+    return 0 if ok else 1
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=("verify", "demo"))
     args = parser.parse_args()
     if args.command == "demo":
         demo()
+        with tempfile.TemporaryDirectory(prefix="history-demo-") as directory:
+            history_checks.history_roundtrip(Path(directory) / "archive.sqlite")
         return 0
-    suite = unittest.defaultTestLoader.discover(str(Path(__file__).parent / "tests"))
-    return 0 if unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful() else 1
+    return verify()
 
 if __name__ == "__main__":
     raise SystemExit(main())
